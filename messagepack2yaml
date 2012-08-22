@@ -1,0 +1,59 @@
+#!/usr/bin/env perl
+#
+# $Id: messagepack2yaml,v 1.3 2011/06/28 06:14:42 ryo Exp $
+#
+# Copyright(c) 2011 Ryo SHIMIZU <ryo@misakimix.org>
+#
+
+use strict;
+use warnings;
+use Data::MessagePack;
+use Getopt::Std;
+use YAML::XS;
+use LWP::Simple;
+
+sub usage {
+	die <<__USAGE__;
+usage: messagepack2yaml [options] [file ...]
+	-q	quiet
+__USAGE__
+}
+
+my %opts;
+getopts('q', \%opts) or usage();
+
+if ($#ARGV >= 0) {
+	for my $file (@ARGV) {
+		print "== $file ==\n" if (($#ARGV > 0) && !exists($opts{q}));
+		messagepack2yaml(scalar(fileread($file)));
+	}
+} else {
+	my $file = join("", <>);
+	messagepack2yaml($file);
+}
+exit;
+
+sub messagepack2yaml {
+	my $messagepack = shift;
+
+	my $data = Data::MessagePack->unpack($messagepack);
+	print YAML::XS::Dump($data);
+}
+
+sub fileread {
+	my $file = shift;
+
+	if ($file =~ m#^(http|https|ftp)://#i) {
+		my $json = get($file);
+		unless (defined $json) {
+			warn "$file: error\n";
+			$json = '{}';
+		}
+		$json;
+	} else {
+		open my $fh, "<", $file or die "open: $file: $!\n";
+		local $/;
+		undef $/;
+		<$fh>;
+	}
+}

@@ -1,0 +1,113 @@
+#!/usr/bin/env perl
+#
+# $Id: yaml2sh,v 1.7 2012/01/13 06:57:15 ryo Exp $
+#
+# Copyright(c) 2011 Ryo SHIMIZU <ryo@misakimix.org>
+#
+
+use strict;
+use warnings;
+use Getopt::Std;
+use LWP::Simple;
+use YAML::Syck;
+use YAML::XS;
+
+sub usage {
+	die <<__USAGE__;
+usage: yaml2sh [file ...]
+	-c	C-shell style
+	-x	use YAML::XS instead of YAML::Syck
+__USAGE__
+}
+
+my %opts;
+getopts("ch", \%opts) or usage();
+
+
+if ($#ARGV >= 0) {
+	for my $file (@ARGV) {
+		yaml2sh(scalar(fileread($file)));
+	}
+} else {
+	my $file = join("", <>);
+	yaml2sh($file);
+}
+exit;
+
+sub yaml2sh {
+	my $yaml = shift;
+
+	my $data;
+	if (exists $opts{x}) {
+		$data = YAML::XS::Load($yaml);
+	} else {
+		$data = YAML::Syck::Load($yaml);
+	}
+
+	shelldump([], $data);
+}
+
+sub shellescape {
+	my $data = shift;
+	$data =~ s/(["`])/\\$1/sg;
+	qq'"$data"';
+}
+
+sub cshellescape {
+	my $data = shift;
+	$data =~ s/([\x00-\x1f\x7f \!\"\$\&\'\(\)\*;<>\?\[\\\]\`\{\|\}~\}])/\\$1/sg;
+	$data;
+}
+
+sub regular_key {
+	my $key = shift;
+	$key =~ s/[^A-Za-z0-9_]/_/sg;
+	$key;
+}
+
+sub output {
+	my ($key, $data) = @_;
+	my $shellkey = join("_", @$key);
+
+	if ($opts{c}) {
+		print "set ", regular_key($shellkey), "=", cshellescape($data), "\n";
+	} else {
+		print regular_key($shellkey), "=", shellescape($data), "\n";
+	}
+}
+
+sub shelldump {
+	my ($keys, $data) = @_;
+
+	my $type = ref $data;
+	unless ($type) {
+		output($keys, $data);
+	} elsif ($type eq 'ARRAY') {
+		for (0 .. $#$data) {
+			shelldump([@$keys, $_], $$data[$_]);
+		}
+	} elsif ($type eq 'HASH') {
+		while (my ($k, $v) = each %$data) {
+			shelldump([@$keys, $k], $v);
+		}
+	} else {
+		output($keys, "UNSUPPORTED");
+	}
+}
+
+sub fileread {
+	my $file = shift;
+
+	if ($file =~ m#^(http|https|ftp)://#i) {
+		my $yaml = get($file);
+		unless (defined $yaml) {
+			warn "$file: error\n";
+			$yaml = '';
+		}
+		$yaml;
+	} else {
+		open my $fh, "< $file" or die "open: $file: $!\n";
+		local $/;
+		<$fh>;
+	}
+}

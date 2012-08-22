@@ -1,0 +1,54 @@
+#!/usr/bin/env perl
+#
+# $Id: json2pson,v 1.7 2011/06/10 05:07:41 ryo Exp $
+#
+# Copyright(c) 2009 Ryo SHIMIZU <ryo@misakimix.org>
+#
+
+use strict;
+use warnings;
+use JSON::XS;
+use Acme::PSON qw(obj2pson pson2obj);
+use LWP::Simple;
+
+if ($#ARGV >= 0) {
+	for my $file (@ARGV) {
+		print "== $file ==\n" if ($#ARGV > 0);
+		json2pson(scalar(fileread($file)));
+	}
+} else {
+	my $file = join("", <>);
+	json2pson($file);
+}
+exit;
+
+sub json2pson {
+	my $json = shift;
+
+	# XXX: json log hack
+	if ($json =~ m/,\n$/s) {
+		$json =~ s/,\n$//s;
+		$json = '[' . $json . ']';
+	}
+
+	my $data = JSON::XS->new->decode($json);
+	print obj2pson($data);
+}
+
+sub fileread {
+	my $file = shift;
+
+	if ($file =~ m#^(http|https|ftp)://#i) {
+		my $json = get($file);
+		unless (defined $json) {
+			warn "$file: error\n";
+			$json = '{}';
+		}
+		$json;
+	} else {
+		open my $fh, "<", $file or die "open: $file: $!\n";
+		local $/;
+		undef $/;
+		<$fh>;
+	}
+}

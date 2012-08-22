@@ -1,0 +1,47 @@
+#!/usr/bin/env perl
+#
+# $Id: yaml2html,v 1.8 2011/06/10 05:07:41 ryo Exp $
+#
+# Copyright(c) 2009 Ryo SHIMIZU <ryo@misakimix.org>
+#
+
+use strict;
+use warnings;
+use YAML::XS;
+use LWP::Simple;
+use Data::Dumper;
+
+
+if ($#ARGV >= 0) {
+	for my $file (@ARGV) {
+		print "== $file ==\n" if ($#ARGV > 0);
+		yaml2html(scalar(fileread($file)));
+	}
+} else {
+	my $file = join("", <>);
+	yaml2html($file);
+}
+exit;
+
+sub yaml2html {
+	my $yaml = shift;
+	my $data = Load($yaml);
+	print Dumper($data);
+}
+
+sub fileread {
+	my $file = shift;
+
+	if ($file =~ m#^(http|https|ftp)://#i) {
+		my $yaml = get($file);
+		unless (defined $yaml) {
+			warn "$file: error\n";
+			$yaml = '';
+		}
+		$yaml;
+	} else {
+		open my $fh, "< $file" or die "open: $file: $!\n";
+		local $/;
+		<$fh>;
+	}
+}

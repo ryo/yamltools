@@ -1,0 +1,47 @@
+#!/usr/bin/env perl
+#
+# $Id: xml2yaml,v 1.10 2011/06/10 05:07:41 ryo Exp $
+#
+# Copyright(c) 2009 Ryo SHIMIZU <ryo@misakimix.org>
+#
+
+use strict;
+use warnings;
+use YAML::XS;
+use XML::Simple;
+use LWP::Simple;
+
+if ($#ARGV >= 0) {
+	for my $file (@ARGV) {
+		print "== $file ==\n" if ($#ARGV > 0);
+		xml2yaml(scalar(fileread($file)));
+	}
+} else {
+	my $file = join("", <>);
+	xml2yaml($file);
+}
+exit;
+
+sub xml2yaml {
+	my $xml = shift;
+	my $data = XMLin($xml);
+	print Dump($data);
+}
+
+sub fileread {
+	my $file = shift;
+
+	if ($file =~ m#^(http|https|ftp)://#i) {
+		my $xml = get($file);
+		unless (defined $xml) {
+			warn "$file: error\n";
+			$xml = '';
+		}
+		$xml;
+	} else {
+		open my $fh, "<", $file or die "open: $file: $!\n";
+		local $/;
+		undef $/;
+		<$fh>;
+	}
+}

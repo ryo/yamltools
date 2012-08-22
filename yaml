@@ -1,0 +1,66 @@
+#!/usr/bin/env perl
+#
+# $Id: yaml,v 1.14 2012/01/13 06:54:49 ryo Exp $
+#
+# Copyright(c) 2009 Ryo SHIMIZU <ryo@misakimix.org>
+#
+
+use strict;
+use warnings;
+use YAML::Syck;
+use YAML::XS;
+use Data::Dumper;
+use LWP::Simple;
+use Getopt::Std;
+
+sub usage {
+	print "usage: yaml [-x] [yamlfile]\n";
+	print "	-x	use YAML::XS instead of YAML::Syck\n";
+	exit;
+}
+
+my %opts;
+getopts("x", \%opts) or usage();
+
+$YAML::Syck::ImplicitTyping = 1;
+
+if ($#ARGV >= 0) {
+	for my $file (@ARGV) {
+		print "== $file ==\n" if ($#ARGV > 0);
+		yamldump(scalar(fileread($file)));
+	}
+} else {
+	my $file = join("", <>);
+	yamldump($file);
+}
+exit;
+
+sub yamldump {
+	my $yaml = shift;
+	my $data;
+
+	if (exists $opts{x}) {
+		$data = YAML::XS::Load($yaml);
+	} else {
+		$data = YAML::Syck::Load($yaml);
+	}
+	print Dumper($data);
+	print "\n";
+}
+
+sub fileread {
+	my $file = shift;
+
+	if ($file =~ m#^(http|https|ftp)://#i) {
+		my $yaml = get($file);
+		unless (defined $yaml) {
+			warn "$file: error\n";
+			$yaml = '';
+		}
+		$yaml;
+	} else {
+		open my $fh, "<", $file or die "open: $file: $!\n";
+		local $/;
+		<$fh>;
+	}
+}

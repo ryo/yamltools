@@ -1,0 +1,60 @@
+#!/usr/bin/env perl
+#
+# $Id: json,v 1.11 2011/06/10 05:07:41 ryo Exp $
+#
+# Copyright(c) 2009 Ryo SHIMIZU <ryo@misakimix.org>
+#
+
+use strict;
+use warnings;
+use JSON::XS;
+use Data::Dumper;
+use LWP::Simple;
+
+if ($#ARGV >= 0) {
+	for my $file (@ARGV) {
+		print "== $file ==\n" if ($#ARGV > 0);
+		json2dump(scalar(fileread($file)));
+	}
+} else {
+	my $file = join("", <>);
+	json2dump($file);
+}
+exit;
+
+sub json2dump {
+	my $json = shift;
+
+	# XXX: json log hack
+	if ($json =~ m/,\n$/s) {
+		$json =~ s/,\n$//s;
+		$json = '[' . $json . ']';
+	}
+
+	my $data;
+	eval('$data = decode_json($json)');
+	unless (defined $data) {
+		$json = '[' . join(",", split(/\n/, $json)) . ']';
+		eval('$data = decode_json($json)');
+	}
+	print Dumper($data);
+	print "\n";
+}
+
+sub fileread {
+	my $file = shift;
+
+	if ($file =~ m#^(http|https|ftp)://#i) {
+		my $json = get($file);
+		unless (defined $json) {
+			warn "$file: error\n";
+			$json = '{}';
+		}
+		$json;
+	} else {
+		open my $fh, "<", $file or die "open: $file: $!\n";
+		local $/;
+		undef $/;
+		<$fh>;
+	}
+}

@@ -1,0 +1,79 @@
+#!/usr/bin/env perl
+#
+# $Id: yaml2json,v 1.15 2012/01/13 06:57:15 ryo Exp $
+#
+# Copyright(c) 2009 Ryo SHIMIZU <ryo@misakimix.org>
+#
+
+use strict;
+use warnings;
+use Data::Dumper;
+use Encode;
+use Getopt::Std;
+use JSON::XS;
+use LWP::Simple;
+use YAML::Syck;
+use YAML::XS;
+
+sub usage {
+	die <<__USAGE__;
+usage: yaml2json [options] [file ...]
+	-a	escape 8bit character using \\uXXXX
+	-s	line separated mode. output json object per line
+	-x	use YAML::XS instead of YAML::Syck
+	-q	quiet
+__USAGE__
+}
+
+my %opts;
+getopts('asxq', \%opts) or usage();
+
+my $json = new JSON::XS;
+$json->ascii(exists $opts{a} ? 1 : 0);
+
+if ($#ARGV >= 0) {
+	for my $file (@ARGV) {
+		print "== $file ==\n" if (($#ARGV > 0) && !exists($opts{q}));
+		yaml2json(scalar(fileread($file)));
+	}
+} else {
+	my $file = join("", <>);
+	yaml2json($file);
+}
+exit;
+
+sub yaml2json {
+	my $yaml = shift;
+
+	my $data;
+	if (exists $opts{x}) {
+		$data = YAML::XS::Load($yaml);
+	} else {
+		$data = YAML::Syck::Load($yaml);
+	}
+
+	if (exists($opts{s}) && (ref($data) eq 'ARRAY')) {
+		for (@$data) {
+			print $json->encode($_), "\n";
+		}
+	} else {
+		print $json->encode($data), "\n";
+	}
+}
+
+sub fileread {
+	my $file = shift;
+
+	if ($file =~ m#^(http|https|ftp)://#i) {
+		my $yaml = get($file);
+		unless (defined $yaml) {
+			warn "$file: error\n";
+			$yaml = '';
+		}
+		$yaml;
+	} else {
+		open my $fh, "< $file" or die "open: $file: $!\n";
+		local $/;
+		<$fh>;
+	}
+}
